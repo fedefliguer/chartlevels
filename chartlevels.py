@@ -138,7 +138,7 @@ def save_data(dataset, df_all):
 def calculador_soportes_resistencias(dataset, lags):
   datasets_soportes_resistencias = {}
   for num_lags in lags:
-    dataset_soportes, dataset_resistencias = calculo_historia(dataset, num_lags, rango_quiebre, l=False)
+    dataset_soportes, dataset_resistencias = calculo_historia(dataset, num_lags, 0.03, l=False)
     dataset = dataset[dataset.columns.drop(list(dataset.filter(regex='l.*b|l.*f|minb|minf|maxb|maxf|Soporte|Resistencia')))]
     lista_soportes_diarios = [seleccion_linea(dataset_soportes, f, p, 's') for f, p in zip(dataset['Date'], dataset['Close'])]
     dataset['soporte_%s_valor' % (num_lags)] = [a_tuple[0] for a_tuple in lista_soportes_diarios]
