@@ -56,8 +56,8 @@ def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_sopor
         resolucion = 'indeterminado por no resolverse nunca'
         print('No llegó a resolverse en el mes.') if Logging else None
   analisis_prueba_list = []
-  analisis_prueba_list.append([ticker+str(round(valor_soporte,2)), ticker, valor_soporte, fecha_empieza_vigencia, prueba_nro, fecha_prueba, fecha_resolucion, resolucion])
-  analisis_prueba = pd.DataFrame(analisis_prueba_list, columns = ["id_soporte", "ticker", "valor", "fecha_ingreso_vigencia", "nro_prueba_historia", "fecha_prueba", "fecha_resolucion", "tipo_resolucion"])
+  analisis_prueba_list.append([str(round(valor_soporte,2)), valor_soporte, fecha_empieza_vigencia, prueba_nro, fecha_prueba, fecha_resolucion, resolucion])
+  analisis_prueba = pd.DataFrame(analisis_prueba_list, columns = ["id_soporte", "valor", "fecha_ingreso_vigencia", "nro_prueba_historia", "fecha_prueba", "fecha_resolucion", "tipo_resolucion"])
   analisis_prueba['fecha_prueba'] = pd.to_datetime(analisis_prueba['fecha_prueba'])
   analisis_prueba['fecha_resolucion'] = pd.to_datetime(analisis_prueba['fecha_resolucion'])
   df_all = save_data(df_all, analisis_prueba)
@@ -86,7 +86,7 @@ def calculo_historia(dataset, lags, rq = 0.03, l = False):
   dataset['Soporte'] = dataset.Soporte * dataset['Close']
   dataset['Resistencia'] = np.where((dataset.index > lags) & (dataset['Close']>dataset['maxb']) & (dataset['Close']>dataset['maxf']), 1, 0)
   dataset['Resistencia'] = dataset.Resistencia * dataset['Close']
-  dataset = dataset[['Date', 'Ticker', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']]
+  dataset = dataset[['Date', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']]
   dataset['Date_vigencia'] = dataset.Date.shift(-lags)
   dataset.replace(0, np.nan, inplace=True)
   puntos_soporte = dataset[dataset.Soporte > 0]['Soporte'].to_numpy() # Lista de soportes
