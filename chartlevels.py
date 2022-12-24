@@ -3,91 +3,93 @@ import pandas as pd
 __version__ = 'dev'
 
 def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase):
-  dataset = dataset[dataset.Date > fecha_empieza_vigencia]
-  dataset['rango_quebrado_inicia'] = valor_soporte * (1-rango_quebrado)
-  dataset['valor'] = valor_soporte
-  dataset['rango_quebrado_termina'] = valor_soporte * (1+rango_quebrado)
-  dataset['es_zona_prueba'] = np.where((dataset['Low'] < dataset['valor']) & (dataset['High'] > dataset['valor']), 1, 0)
-  if clase == 's':
-    dataset['es_zona_confirmacion'] = np.where((dataset['Close'] > dataset['rango_quebrado_termina']), 1, 0)
-    dataset['es_zona_quiebre'] = np.where((dataset['Close'] < dataset['rango_quebrado_inicia']), 1, 0)
-  elif clase == 'r':
-    dataset['es_zona_quiebre'] = np.where((dataset['Close'] > dataset['rango_quebrado_termina']), 1, 0)
-    dataset['es_zona_confirmacion'] = np.where((dataset['Close'] < dataset['rango_quebrado_inicia']), 1, 0)
-  mascara_probado = (dataset.es_zona_prueba == 1)
-  mascara_quebrado = (dataset.es_zona_quiebre == 1)
-  if len(dataset[mascara_probado]) == 0 & len(dataset[mascara_quebrado]) == 0:
-    resolucion = 'vigente'
-    fecha_prueba = np.nan
-    fecha_resolucion = np.nan
-    print('La prueba número ', prueba_nro, 'nunca se realizó en la historia') if Logging else None
-  elif len(dataset[mascara_probado]) == 0:
-    resolucion = 'quebrado sin probarse nunca'
-    fecha_prueba = np.nan
-    fecha_resolucion = np.nan
-    print('La prueba', prueba_nro, 'nunca se realizó, pero el valor fue quebrado') if Logging else None
-  else:
-    fecha_prueba = dataset[mascara_probado].iloc[0].Date
-    resolucion = ''
-    if len(dataset[mascara_quebrado]) > 0:
-      fecha_quiebre = dataset[mascara_quebrado].iloc[0].Date
-      if fecha_quiebre < fecha_prueba:      
-        resolucion = 'quebrado'
-        fecha_prueba = np.nan
-        fecha_resolucion = fecha_quiebre
-        print('La prueba', prueba_nro, 'fue quebrada antes de probarse') if Logging else None
-    if resolucion != 'quebrado':
-      print('La prueba número ', prueba_nro, 'empezó el día ', fecha_prueba, ' cuando el mínimo fue ', dataset[mascara_probado].iloc[0].Low, ' y el máximo fue ', dataset[mascara_probado].iloc[0].High) if Logging else None
-      mascara_resuelto = ((dataset.Date > fecha_prueba)&(dataset.es_zona_confirmacion == 1))|((dataset.Date > fecha_prueba)&(dataset.es_zona_quiebre == 1))
-      if len(dataset[mascara_resuelto]): # La prueba fue resuelta
-        fecha_resolucion = dataset[mascara_resuelto].iloc[0].Date
-        print('Fue resuelta el día ', fecha_resolucion, ' cuando el mínimo fue ', dataset[mascara_resuelto].iloc[0].Low, ' y el máximo fue ', dataset[mascara_resuelto].iloc[0].High) if Logging else None
-        if (dataset[mascara_resuelto].iloc[0].es_zona_confirmacion == 1) & (dataset[mascara_resuelto].iloc[0].es_zona_quiebre == 1):
-          resolucion = 'indeterminado por resolverse el mismo día'
-          print('La prueba número ', prueba_nro, 'completó la historia sin ser determinada') if Logging else None
-        elif dataset[mascara_resuelto].iloc[0].es_zona_confirmacion == 1:
-          resolucion = 'probado'
-          print('La prueba número ', prueba_nro, 'completó la historia probada el día ', fecha_resolucion) if Logging else None
-        elif dataset[mascara_resuelto].iloc[0].es_zona_quiebre == 1:
+  dataset = dataset[dataset.Date > fecha_empieza_vigencia].copy()
+  if len(dataset) > 0:
+    dataset.loc[:,'rango_quebrado_inicia'] = valor_soporte * (1-rango_quebrado)
+    dataset.loc[:,'valor'] = valor_soporte
+    dataset.loc[:,'rango_quebrado_termina'] = valor_soporte * (1+rango_quebrado)
+    dataset.loc[:,'es_zona_prueba'] = np.where((dataset['Low'] < dataset['valor']) & (dataset['High'] > dataset['valor']), 1, 0)
+    if clase == 's':
+      dataset.loc[:,'es_zona_confirmacion'] = np.where((dataset['Close'] > dataset['rango_quebrado_termina']), 1, 0)
+      dataset.loc[:,'es_zona_quiebre'] = np.where((dataset['Close'] < dataset['rango_quebrado_inicia']), 1, 0)
+    elif clase == 'r':
+      dataset.loc[:,'es_zona_quiebre'] = np.where((dataset['Close'] > dataset['rango_quebrado_termina']), 1, 0)
+      dataset.loc[:,'es_zona_confirmacion'] = np.where((dataset['Close'] < dataset['rango_quebrado_inicia']), 1, 0)
+    mascara_probado = (dataset.es_zona_prueba == 1)
+    mascara_quebrado = (dataset.es_zona_quiebre == 1)
+    if len(dataset[mascara_probado]) == 0 & len(dataset[mascara_quebrado]) == 0:
+      resolucion = 'vigente'
+      fecha_prueba = np.nan
+      fecha_resolucion = np.nan
+      print('La prueba número ', prueba_nro, 'nunca se realizó en la historia') if Logging else None
+    elif len(dataset[mascara_probado]) == 0:
+      resolucion = 'quebrado sin probarse nunca'
+      fecha_prueba = np.nan
+      fecha_resolucion = np.nan
+      print('La prueba', prueba_nro, 'nunca se realizó, pero el valor fue quebrado') if Logging else None
+    else:
+      fecha_prueba = dataset[mascara_probado].iloc[0].Date
+      resolucion = ''
+      if len(dataset[mascara_quebrado]) > 0:
+        fecha_quiebre = dataset[mascara_quebrado].iloc[0].Date
+        if fecha_quiebre < fecha_prueba:      
           resolucion = 'quebrado'
-          print('La prueba número ', prueba_nro, 'completó la historia quebrada el día ', fecha_resolucion) if Logging else None
-      else:
-        fecha_resolucion = np.nan
-        resolucion = 'indeterminado por no resolverse nunca'
-        print('No llegó a resolverse en el mes.') if Logging else None
-  analisis_prueba_list = []
-  analisis_prueba_list.append([str(round(valor_soporte,2)), valor_soporte, fecha_empieza_vigencia, prueba_nro, fecha_prueba, fecha_resolucion, resolucion])
-  analisis_prueba = pd.DataFrame(analisis_prueba_list, columns = ["id_soporte", "valor", "fecha_ingreso_vigencia", "nro_prueba_historia", "fecha_prueba", "fecha_resolucion", "tipo_resolucion"])
-  analisis_prueba['fecha_prueba'] = pd.to_datetime(analisis_prueba['fecha_prueba'])
-  analisis_prueba['fecha_resolucion'] = pd.to_datetime(analisis_prueba['fecha_resolucion'])
-  df_all = save_data(df_all, analisis_prueba)
-  if resolucion == 'probado':
-    print('La prueba número ', prueba_nro, 'admite nuevas pruebas') if Logging else None
-    prueba_nro = prueba_nro + 1
-    dataset = dataset[dataset.Date > fecha_resolucion]
-    return recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase)
+          fecha_prueba = np.nan
+          fecha_resolucion = fecha_quiebre
+          print('La prueba', prueba_nro, 'fue quebrada antes de probarse') if Logging else None
+      if resolucion != 'quebrado':
+        print('La prueba número ', prueba_nro, 'empezó el día ', fecha_prueba, ' cuando el mínimo fue ', dataset[mascara_probado].iloc[0].Low, ' y el máximo fue ', dataset[mascara_probado].iloc[0].High) if Logging else None
+        mascara_resuelto = ((dataset.Date > fecha_prueba)&(dataset.es_zona_confirmacion == 1))|((dataset.Date > fecha_prueba)&(dataset.es_zona_quiebre == 1))
+        if len(dataset[mascara_resuelto]): # La prueba fue resuelta
+          fecha_resolucion = dataset[mascara_resuelto].iloc[0].Date
+          print('Fue resuelta el día ', fecha_resolucion, ' cuando el mínimo fue ', dataset[mascara_resuelto].iloc[0].Low, ' y el máximo fue ', dataset[mascara_resuelto].iloc[0].High) if Logging else None
+          if (dataset[mascara_resuelto].iloc[0].es_zona_confirmacion == 1) & (dataset[mascara_resuelto].iloc[0].es_zona_quiebre == 1):
+            resolucion = 'indeterminado por resolverse el mismo día'
+            print('La prueba número ', prueba_nro, 'completó la historia sin ser determinada') if Logging else None
+          elif dataset[mascara_resuelto].iloc[0].es_zona_confirmacion == 1:
+            resolucion = 'probado'
+            print('La prueba número ', prueba_nro, 'completó la historia probada el día ', fecha_resolucion) if Logging else None
+          elif dataset[mascara_resuelto].iloc[0].es_zona_quiebre == 1:
+            resolucion = 'quebrado'
+            print('La prueba número ', prueba_nro, 'completó la historia quebrada el día ', fecha_resolucion) if Logging else None
+        else:
+          fecha_resolucion = np.nan
+          resolucion = 'indeterminado por no resolverse nunca'
+          print('No llegó a resolverse en el mes.') if Logging else None
+    analisis_prueba_list = []
+    analisis_prueba_list.append([str(round(valor_soporte,2)), valor_soporte, fecha_empieza_vigencia, prueba_nro, fecha_prueba, fecha_resolucion, resolucion])
+    analisis_prueba = pd.DataFrame(analisis_prueba_list, columns = ["id_soporte", "valor", "fecha_ingreso_vigencia", "nro_prueba_historia", "fecha_prueba", "fecha_resolucion", "tipo_resolucion"])
+    analisis_prueba['fecha_prueba'] = pd.to_datetime(analisis_prueba['fecha_prueba'])
+    analisis_prueba['fecha_resolucion'] = pd.to_datetime(analisis_prueba['fecha_resolucion'])
+    df_all = save_data(df_all, analisis_prueba)
+    if resolucion == 'probado':
+      print('La prueba número ', prueba_nro, 'admite nuevas pruebas') if Logging else None
+      prueba_nro = prueba_nro + 1
+      dataset = dataset[dataset.Date > fecha_resolucion].copy()
+      return recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase)
+    else:
+      return df_all
   else:
     return df_all
 
 def calculo_historia(dataset, lags, rq = 0.03, l = False):
   i = 1
   while i < (lags+1): # Genera ventanas alrededor para analizar si es soporte
-      colname = 'l%sb' % (i)                                                  
-      dataset[colname] = round(dataset['Close'].shift(i),2)
-      colname = 'l%sf' % (i)                                                  
-      dataset[colname] = round(dataset['Close'].shift(-i),2)
+      colname = 'l%sb' % (i)
+      dataset.loc[:,colname] = round(dataset['Close'].shift(i),2)
+      colname = 'l%sf' % (i)
+      dataset.loc[:,colname] = round(dataset['Close'].shift(-i),2)
       i = i + 1
-  x = np.arange(len(dataset.Date))
-  dataset['minb'] = round(dataset.filter(regex=("^l(.*)b$")).min(axis=1),2)
-  dataset['minf'] = round(dataset.filter(regex=("^l(.*)f$")).min(axis=1),2)
-  dataset['maxb'] = round(dataset.filter(regex=("^l(.*)b$")).max(axis=1),2)
-  dataset['maxf'] = round(dataset.filter(regex=("^l(.*)f$")).max(axis=1),2)
-  dataset['Soporte'] = np.where((dataset.index > lags) & (dataset['Close']<dataset['minb']) & (dataset['Close']<dataset['minf']), 1, 0)
-  dataset['Soporte'] = dataset.Soporte * dataset['Close']
-  dataset['Resistencia'] = np.where((dataset.index > lags) & (dataset['Close']>dataset['maxb']) & (dataset['Close']>dataset['maxf']), 1, 0)
-  dataset['Resistencia'] = dataset.Resistencia * dataset['Close']
-  dataset = dataset[['Date', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']]
-  dataset['Date_vigencia'] = dataset.Date.shift(-lags)
+  dataset.loc[:,'minb'] = round(dataset.filter(regex=("^l(.*)b$")).min(axis=1),2)
+  dataset.loc[:,'minf'] = round(dataset.filter(regex=("^l(.*)f$")).min(axis=1),2)
+  dataset.loc[:,'maxb'] = round(dataset.filter(regex=("^l(.*)b$")).max(axis=1),2)
+  dataset.loc[:,'maxf'] = round(dataset.filter(regex=("^l(.*)f$")).max(axis=1),2)
+  dataset.loc[:,'Soporte'] = np.where((dataset.index > lags) & (dataset['Close']<dataset['minb']) & (dataset['Close']<dataset['minf']), 1, 0)
+  dataset.loc[:,'Soporte'] = dataset.Soporte * dataset['Close']
+  dataset.loc[:,'Resistencia'] = np.where((dataset.index > lags) & (dataset['Close']>dataset['maxb']) & (dataset['Close']>dataset['maxf']), 1, 0)
+  dataset.loc[:,'Resistencia'] = dataset.Resistencia * dataset['Close']
+  dataset = dataset[['Date', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']].copy()
+  dataset.loc[:,'Date_vigencia'] = dataset.Date.shift(-lags)
   dataset.replace(0, np.nan, inplace=True)
   puntos_soporte = dataset[dataset.Soporte > 0]['Soporte'].to_numpy() # Lista de soportes
   fechas_soporte = dataset[dataset.Soporte > 0]['Date'].to_numpy() # Lista de fechas de soporte
@@ -140,15 +142,15 @@ def calculador_soportes_resistencias(dataset, lags):
   datasets_soportes_resistencias = {}
   for num_lags in lags:
     dataset_soportes, dataset_resistencias = calculo_historia(dataset, num_lags, 0.03, l=False)
-    dataset = dataset[dataset.columns.drop(list(dataset.filter(regex='l.*b|l.*f|minb|minf|maxb|maxf|Soporte|Resistencia')))]
+    dataset = dataset[dataset.columns.drop(list(dataset.filter(regex='l.*b|l.*f|minb|minf|maxb|maxf|Soporte|Resistencia')))].copy()
     lista_soportes_diarios = [seleccion_linea(dataset_soportes, f, p, 's') for f, p in zip(dataset['Date'], dataset['Close'])]
-    dataset['soporte_%s_valor' % (num_lags)] = [a_tuple[0] for a_tuple in lista_soportes_diarios]
-    dataset['soporte_%s_numero_pruebas' % (num_lags)] = [a_tuple[1] for a_tuple in lista_soportes_diarios]
-    dataset['soporte_%s_dias_antiguedad' % (num_lags)] = [a_tuple[2] for a_tuple in lista_soportes_diarios]
+    dataset.loc[:,'soporte_%s_valor' % (num_lags)] = [a_tuple[0] for a_tuple in lista_soportes_diarios]
+    dataset.loc[:,'soporte_%s_numero_pruebas' % (num_lags)] = [a_tuple[1] for a_tuple in lista_soportes_diarios]
+    dataset.loc[:,'soporte_%s_dias_antiguedad' % (num_lags)] = [a_tuple[2] for a_tuple in lista_soportes_diarios]
     lista_resistencias_diarias  = [seleccion_linea(dataset_resistencias, f, p, 'r') for f, p in zip(dataset['Date'], dataset['Close'])]
-    dataset['resistencia_%s_valor' % (num_lags)] = [a_tuple[0] for a_tuple in lista_resistencias_diarias]
-    dataset['resistencia_%s_numero_pruebas' % (num_lags)] = [a_tuple[1] for a_tuple in lista_resistencias_diarias]
-    dataset['resistencia_%s_dias_antiguedad' % (num_lags)] = [a_tuple[2] for a_tuple in lista_resistencias_diarias]
+    dataset.loc[:,'resistencia_%s_valor' % (num_lags)] = [a_tuple[0] for a_tuple in lista_resistencias_diarias]
+    dataset.loc[:,'resistencia_%s_numero_pruebas' % (num_lags)] = [a_tuple[1] for a_tuple in lista_resistencias_diarias]
+    dataset.loc[:,'resistencia_%s_dias_antiguedad' % (num_lags)] = [a_tuple[2] for a_tuple in lista_resistencias_diarias]
     datasets_soportes_resistencias["dataset_soportes_{0}".format(num_lags)] = dataset_soportes
     datasets_soportes_resistencias["dataset_resistencias_{0}".format(num_lags)] = dataset_resistencias
   dataset = dataset[dataset.columns.drop(list(dataset.filter(regex='l(.*)b')))]
