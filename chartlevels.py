@@ -2,7 +2,53 @@ import numpy as np
 import pandas as pd
 __version__ = 'dev'
 
+def calculo_historia(dataset, lags, rq = 0.03, l = False):
+  '''
+  Función que identifica cuáles son los puntos de soporte y resistencia (máximos y mínimos locales) y a través de recorrido_soportes_resistencias() devuelve dos dataframes con las pruebas de los soportes y las resistencias en la historia.
+  '''
+  i = 1
+  while i < (lags+1): # Genera ventanas alrededor para analizar si es soporte
+      colname = 'l%sb' % (i)
+      dataset.loc[:,colname] = round(dataset['Close'].shift(i),2)
+      colname = 'l%sf' % (i)
+      dataset.loc[:,colname] = round(dataset['Close'].shift(-i),2)
+      i = i + 1
+  dataset.loc[:,'minb'] = round(dataset.filter(regex=("^l(.*)b$")).min(axis=1),2)
+  dataset.loc[:,'minf'] = round(dataset.filter(regex=("^l(.*)f$")).min(axis=1),2)
+  dataset.loc[:,'maxb'] = round(dataset.filter(regex=("^l(.*)b$")).max(axis=1),2)
+  dataset.loc[:,'maxf'] = round(dataset.filter(regex=("^l(.*)f$")).max(axis=1),2)
+  dataset.loc[:,'Soporte'] = np.where((dataset.index > lags) & (dataset['Close']<dataset['minb']) & (dataset['Close']<dataset['minf']), 1, 0)
+  dataset.loc[:,'Soporte'] = dataset.Soporte * dataset['Close']
+  dataset.loc[:,'Resistencia'] = np.where((dataset.index > lags) & (dataset['Close']>dataset['maxb']) & (dataset['Close']>dataset['maxf']), 1, 0)
+  dataset.loc[:,'Resistencia'] = dataset.Resistencia * dataset['Close']
+  dataset = dataset[['Date', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']].copy()
+  dataset.loc[:,'Date_vigencia'] = dataset.Date.shift(-lags)
+  dataset.replace(0, np.nan, inplace=True)
+  puntos_soporte = dataset[dataset.Soporte > 0]['Soporte'].to_numpy() # Lista de soportes
+  fechas_soporte = dataset[dataset.Soporte > 0]['Date'].to_numpy() # Lista de fechas de soporte
+  fechas_vigencia_soporte = dataset[dataset.Soporte > 0]['Date_vigencia'].to_numpy() # Lista de fechas de soporte
+  print('EMPIEZA ANÁLISIS DE SOPORTES') if l else None
+  dataset_all_soportes = pd.DataFrame()
+  i = 0
+  while i < len(puntos_soporte):  # Recorre la lista de soportes
+    dataset_all_soportes = recorrido_soportes_resistencias(dataset, fechas_vigencia_soporte[i], puntos_soporte[i], rq, dataset_all_soportes, 1, Logging=l, clase='s')
+    i = i + 1
+  print('EMPIEZA ANÁLISIS DE RESISTENCIAS') if l else None
+  puntos_resistencia = dataset[dataset.Resistencia > 0]['Resistencia'].to_numpy() # Lista de resistencia
+  fechas_resistencia = dataset[dataset.Resistencia > 0]['Date'].to_numpy() # Lista de fechas de resistencia
+  fechas_vigencia_resistencia = dataset[dataset.Resistencia > 0]['Date_vigencia'].to_numpy() # Lista de fechas de soporte
+  dataset_all_resistencias = pd.DataFrame()
+  i = 0
+  while i < len(puntos_resistencia):  # Recorre la lista de resistencia
+    print('ANALIZO EL PUNTO ', puntos_resistencia[i], ' DEL ', fechas_resistencia[i], ' QUE ENTRARÍA EN VIGENCIA EL ', fechas_vigencia_resistencia[i]) if l else None
+    dataset_all_resistencias = recorrido_soportes_resistencias(dataset, fechas_vigencia_resistencia[i], puntos_resistencia[i], rq, dataset_all_resistencias, 1, Logging=l, clase='r')
+    i = i + 1
+  return dataset_all_soportes, dataset_all_resistencias
+
 def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase):
+  '''
+  Función que para cada soporte y resistencia establece su tiempo de vigencia y duración, entendida como el tiempo que pasó sin ser quebrado hacia arriba (si es resistencia) o hacia abajo (si es soporte).
+  '''
   dataset = dataset[dataset.Date > fecha_empieza_vigencia].copy()
   if len(dataset) > 0:
     dataset.loc[:,'rango_quebrado_inicia'] = valor_soporte * (1-rango_quebrado)
@@ -61,7 +107,7 @@ def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_sopor
     analisis_prueba = pd.DataFrame(analisis_prueba_list, columns = ["id_soporte", "valor", "fecha_ingreso_vigencia", "nro_prueba_historia", "fecha_prueba", "fecha_resolucion", "tipo_resolucion"])
     analisis_prueba['fecha_prueba'] = pd.to_datetime(analisis_prueba['fecha_prueba'])
     analisis_prueba['fecha_resolucion'] = pd.to_datetime(analisis_prueba['fecha_resolucion'])
-    df_all = save_data(df_all, analisis_prueba)
+    df_all = pd.concat([df_all, analisis_prueba], axis=0)
     if resolucion == 'probado':
       print('La prueba número ', prueba_nro, 'admite nuevas pruebas') if Logging else None
       prueba_nro = prueba_nro + 1
@@ -72,47 +118,10 @@ def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_sopor
   else:
     return df_all
 
-def calculo_historia(dataset, lags, rq = 0.03, l = False):
-  i = 1
-  while i < (lags+1): # Genera ventanas alrededor para analizar si es soporte
-      colname = 'l%sb' % (i)
-      dataset.loc[:,colname] = round(dataset['Close'].shift(i),2)
-      colname = 'l%sf' % (i)
-      dataset.loc[:,colname] = round(dataset['Close'].shift(-i),2)
-      i = i + 1
-  dataset.loc[:,'minb'] = round(dataset.filter(regex=("^l(.*)b$")).min(axis=1),2)
-  dataset.loc[:,'minf'] = round(dataset.filter(regex=("^l(.*)f$")).min(axis=1),2)
-  dataset.loc[:,'maxb'] = round(dataset.filter(regex=("^l(.*)b$")).max(axis=1),2)
-  dataset.loc[:,'maxf'] = round(dataset.filter(regex=("^l(.*)f$")).max(axis=1),2)
-  dataset.loc[:,'Soporte'] = np.where((dataset.index > lags) & (dataset['Close']<dataset['minb']) & (dataset['Close']<dataset['minf']), 1, 0)
-  dataset.loc[:,'Soporte'] = dataset.Soporte * dataset['Close']
-  dataset.loc[:,'Resistencia'] = np.where((dataset.index > lags) & (dataset['Close']>dataset['maxb']) & (dataset['Close']>dataset['maxf']), 1, 0)
-  dataset.loc[:,'Resistencia'] = dataset.Resistencia * dataset['Close']
-  dataset = dataset[['Date', 'Close', 'Low', 'High', 'Soporte', 'Resistencia']].copy()
-  dataset.loc[:,'Date_vigencia'] = dataset.Date.shift(-lags)
-  dataset.replace(0, np.nan, inplace=True)
-  puntos_soporte = dataset[dataset.Soporte > 0]['Soporte'].to_numpy() # Lista de soportes
-  fechas_soporte = dataset[dataset.Soporte > 0]['Date'].to_numpy() # Lista de fechas de soporte
-  fechas_vigencia_soporte = dataset[dataset.Soporte > 0]['Date_vigencia'].to_numpy() # Lista de fechas de soporte
-  print('EMPIEZA ANÁLISIS DE SOPORTES') if l else None
-  dataset_all_soportes = pd.DataFrame()
-  i = 0
-  while i < len(puntos_soporte):  # Recorre la lista de soportes
-    dataset_all_soportes = recorrido_soportes_resistencias(dataset, fechas_vigencia_soporte[i], puntos_soporte[i], rq, dataset_all_soportes, 1, Logging=l, clase='s')
-    i = i + 1
-  print('EMPIEZA ANÁLISIS DE RESISTENCIAS') if l else None
-  puntos_resistencia = dataset[dataset.Resistencia > 0]['Resistencia'].to_numpy() # Lista de resistencia
-  fechas_resistencia = dataset[dataset.Resistencia > 0]['Date'].to_numpy() # Lista de fechas de resistencia
-  fechas_vigencia_resistencia = dataset[dataset.Resistencia > 0]['Date_vigencia'].to_numpy() # Lista de fechas de soporte
-  dataset_all_resistencias = pd.DataFrame()
-  i = 0
-  while i < len(puntos_resistencia):  # Recorre la lista de resistencia
-    print('ANALIZO EL PUNTO ', puntos_resistencia[i], ' DEL ', fechas_resistencia[i], ' QUE ENTRARÍA EN VIGENCIA EL ', fechas_vigencia_resistencia[i]) if l else None
-    dataset_all_resistencias = recorrido_soportes_resistencias(dataset, fechas_vigencia_resistencia[i], puntos_resistencia[i], rq, dataset_all_resistencias, 1, Logging=l, clase='r')
-    i = i + 1
-  return dataset_all_soportes, dataset_all_resistencias
-
 def seleccion_linea(dataset, fecha, precio, clase):
+  '''
+  Función que para cada rueda identifica el punto de soporte o resistencia más cercano y lo establece como el vigente.
+  '''
   mascara_iniciados_antes = (dataset.fecha_ingreso_vigencia < fecha)
   mascara_vigentes_hoy = (dataset.tipo_resolucion == 'vigente')
   mascara_quebrados_despues = ((dataset.tipo_resolucion == 'quebrado') & (dataset.fecha_resolucion > fecha))|((dataset.tipo_resolucion == 'indeterminado por resolverse el mismo día') & (dataset.fecha_resolucion > fecha))
@@ -134,11 +143,10 @@ def seleccion_linea(dataset, fecha, precio, clase):
     except:
       return np.nan, np.nan, np.nan
 
-def save_data(dataset, df_all):
-    df_all = pd.concat([dataset, df_all], axis=0)
-    return df_all
-
-def calculador_soportes_resistencias(dataset, lags):
+def calculador_soportes_resistencias(dataset, lags = [10]):
+  '''
+  Función que consolida todas las anteriores calculando valor/antigüedad/número de pruebas de soporte y resistencia para todo el dataset. El parámetro lags es un array con los distintos intervalos para considerarse máximo o mínimo local, cuánto más grande más exigente (y por lo tanto menos frecuentes) los soportes y las resistencias. 
+  '''
   datasets_soportes_resistencias = {}
   for num_lags in lags:
     dataset_soportes, dataset_resistencias = calculo_historia(dataset, num_lags, 0.03, l=False)
