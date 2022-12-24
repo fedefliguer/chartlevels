@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 __version__ = 'dev'
 
 def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase):
