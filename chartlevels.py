@@ -1,3 +1,4 @@
+import numpy as np
 __version__ = 'dev'
 
 def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_soporte, rango_quebrado, df_all, prueba_nro, Logging, clase):
@@ -68,7 +69,6 @@ def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_sopor
     return df_all
 
 def calculo_historia(dataset, lags, rq = 0.03, l = False):
-  start_time = time.time()
   i = 1
   while i < (lags+1): # Genera ventanas alrededor para analizar si es soporte
       colname = 'l%sb' % (i)                                                  
