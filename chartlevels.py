@@ -63,7 +63,7 @@ def recorrido_soportes_resistencias(dataset, fecha_empieza_vigencia, valor_sopor
       dataset.loc[:,'es_zona_confirmacion'] = np.where((dataset['Close'] < dataset['rango_quebrado_inicia']), 1, 0)
     mascara_probado = (dataset.es_zona_prueba == 1)
     mascara_quebrado = (dataset.es_zona_quiebre == 1)
-    if len(dataset[mascara_probado]) == 0 & len(dataset[mascara_quebrado]) == 0:
+    if (len(dataset[mascara_probado]) == 0) & (len(dataset[mascara_quebrado]) == 0):
       resolucion = 'vigente'
       fecha_prueba = np.nan
       fecha_resolucion = np.nan
